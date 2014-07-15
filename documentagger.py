@@ -1,7 +1,11 @@
 
 # coding: utf-8
 
-# In[214]:
+# #Multi-Label Document Classification
+# 
+# This project aims to use 60 documents to create a multi-label classification system, with entity extraction as a fringe benefit. 
+
+# In[287]:
 
 import numpy as np
 import pandas as pd
@@ -9,24 +13,25 @@ import nltk
 import re
 import os
 import codecs
+import random
 
 
-# In[215]:
+# In[288]:
 
 metadata = pd.read_csv("DocumentTagResults.csv")
 
 
-# In[216]:
+# In[289]:
 
 metadata.columns
 
 
-# In[217]:
+# In[290]:
 
 metadata['FileName'] = metadata['FileName'].replace(to_replace='.docx', value='.htm', regex=True)
 
 
-# In[218]:
+# In[291]:
 
 filenames = os.listdir('/Users/brandomr/Sites/docs')
 #gets list of filenames in the document directory
@@ -34,8 +39,64 @@ filenames = os.listdir('/Users/brandomr/Sites/docs')
 len(filenames)
 #tests how many files are in the docs folder
 
+filenames = sorted(filenames)
 
-# In[219]:
+
+# In[292]:
+
+metadata = metadata.sort(columns = 'FileName')
+
+
+# In[293]:
+
+#this is a quick check on how many tags each document has
+numbertags = metadata.pivot_table(values='DocumentID', rows=['FileName'], aggfunc = len)
+
+print 'Per document the'
+print 'max number of tags is ' + str(numbertags.max())
+print 'min number of tags is ' + str(numbertags.min())
+print 'mean number of tags is ' + str(numbertags.mean())
+print 'median number of tags is ' + str(numbertags.median())
+
+
+# In[299]:
+
+#creates list of tuples for document tags
+taglist = []
+for i in range(len(filenames)):
+    doctags = metadata[metadata['FileName'] == filenames[i]]['TagName'].tolist()
+    doctags = sorted(doctags)
+    taglist.append(doctags)
+
+#this function pulls a random subset from a list
+def random_subset(iterator, k):
+    result = []
+    n = 0
+    
+    for item in iterator:
+        n +=1
+        if len(result) < k:
+            result.append(item)
+        else:
+            s = int(random.random()*n)
+            if s < k: 
+                result[s] = item
+    
+    return result
+
+#the below code pulls 2 random tags and from the tag list per document    
+#taglist_reduced = []
+#for i in range(len(taglist)):
+#    tagitem = random_subset(taglist[i],2)
+#    taglist_reduced.append(tagitem)
+
+
+# In[306]:
+
+taglist_reduced[:10]
+
+
+# In[300]:
 
 corpora = []
 
@@ -55,7 +116,7 @@ for i in filenames:
     #adds to corpora
 
 
-# In[283]:
+# In[301]:
 
 #tokenizes and chunks for entity extraction
 def extract_entities(text):
@@ -84,7 +145,7 @@ def get_entitylist(list, i):
     return entitylist
 
 
-# In[275]:
+# In[302]:
 
 #uniq is a function to return only unique items for a given list
 def uniq(input):
@@ -95,7 +156,7 @@ def uniq(input):
     return output
 
 
-# In[286]:
+# In[303]:
 
 #prints each item in a list on it's own line
 def printbyline(list):
@@ -103,24 +164,72 @@ def printbyline(list):
         print item
 
 
-# In[287]:
+# In[161]:
 
+#just a test of the entity extraction tool
 entitysample = uniq(get_entitylist(corpora, 1))
 
-
-# In[278]:
-
-printbyline(sorted(entitysample))
+printbyline(sorted(entitysample[:10]))
 
 
-# In[288]:
+# In[304]:
 
-sampletext = ['Brandon is the bomb diggety fresh. He lives in Washington DC in a small apartment with Barb. He loves her very much and likes going to work at the State Department. One day he will be rich and famous and have houses in New York City and San Francisco and Hong Kong and Los Angeles and San Diego.']
+#converts corpora from a list into a list of tuples where each tuple is the text of the document
+i=0
+corpora_processing = []
+while i < len(corpora):
+    corpora_processing.append(corpora[i:i+1])
+    i += 1
 
 
-# In[289]:
+# 
+# 
+# 
+# 
+# #The classification function
+# Below, I specify the parameters of the classification function and use it on a training set: the first 50 documents in the corpus. I use the last 10 documents in the corpus as a test set.
 
-get_entitylist(sampletext,0)
+# In[358]:
+
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.svm import LinearSVC
+from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.multiclass import OneVsRestClassifier
+
+x_train = np.array(corpora[:50])
+y_train = taglist[:50]
+
+x_test = np.array(corpora[50:60])
+y_test = taglist[50:60]
+
+classifier = Pipeline([
+    ('vectorizer', CountVectorizer(ngram_range=(3, 3), stop_words='english', min_df=0.1, max_df=0.75, max_features=500)),
+    ('tfidf', TfidfTransformer()),
+    ('clf', OneVsRestClassifier(LinearSVC()))])
+classifier.fit(x_train, y_train)
+predicted = classifier.predict(x_test)
+
+print predicted
+len(predicted)
+
+
+# In[359]:
+
+for i in range(len(predicted)):
+    print 'Predicted: ' + str(predicted[i])
+    print 'Actual: ' +str(y_test[i])
+    print
+
+
+# In[338]:
+
+sample_text = np.array(['In Sudan, there are many small businesses and we need to support them with NGOs and public-private partnerships.',
+                        'In China, we have lots of new technology emerging. The USG should strategically plan around this',
+                        'The embassy in Argentina is working hard on trade issues.'])
+print classifier.predict(sample_text)
 
 
 # In[ ]:
